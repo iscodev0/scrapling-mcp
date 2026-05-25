@@ -97,7 +97,9 @@ class InteractionTools:
         session_id: str,
         headless: bool = True,
         solve_cloudflare: bool = True,
-        **kwargs
+        hide_canvas: bool = True,
+        block_webrtc: bool = True,
+        allow_webgl: bool = True
     ) -> dict[str, Any]:
         """
         Open a stealthy session with Cloudflare bypass capabilities.
@@ -108,7 +110,9 @@ class InteractionTools:
         :param session_id: Unique identifier for the session
         :param headless: Run browser in headless mode
         :param solve_cloudflare: Automatically solve Cloudflare challenges
-        :param kwargs: Additional arguments for AsyncStealthySession
+        :param hide_canvas: Add random noise to canvas operations
+        :param block_webrtc: Block WebRTC to prevent IP leaks
+        :param allow_webgl: Allow WebGL rendering
         :return: Dict with session info
         """
         if session_id in self._cloudflare_sessions:
@@ -117,9 +121,9 @@ class InteractionTools:
         # Create stealthy session with all anti-detection features
         session = AsyncStealthySession(
             headless=headless,
-            hide_canvas=kwargs.get('hide_canvas', True),
-            block_webrtc=kwargs.get('block_webrtc', True),
-            allow_webgl=kwargs.get('allow_webgl', True),
+            hide_canvas=hide_canvas,
+            block_webrtc=block_webrtc,
+            allow_webgl=allow_webgl,
         )
         
         await session.start()
