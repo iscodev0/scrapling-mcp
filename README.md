@@ -121,58 +121,84 @@ Configure your MCP client:
 ### Basic Scraping
 
 ```python
-# Fetch a page with HTTP request
-get(url="https://example.com", impersonate="chrome")
-
-# Extract text with CSS selector
-get_text(css_selector=".article-content")
-
-# Extract as Markdown
-get_markdown(main_content_only=True)
+# Fetch a page with HTTP request (returns content directly)
+result = get(
+    url="https://example.com",
+    impersonate="chrome",
+    extraction_type="markdown",  # or "html" or "text"
+    css_selector=".article-content",  # optional: extract only specific elements
+    main_content_only=True  # optional: extract only main content
+)
+# result.content contains the extracted markdown/html/text
 ```
 
 ### Anti-Bot Bypass
 
 ```python
-# Fetch Cloudflare-protected site
-stealthy_fetch(
+# Fetch Cloudflare-protected site with stealthy browser
+result = stealthy_fetch(
     url="https://protected-site.com",
     solve_cloudflare=True,
-    headless=True
+    headless=True,
+    extraction_type="markdown"
 )
+# result.content contains the extracted content
 ```
 
 ### Interactive Browser Automation
 
 ```python
 # Open browser session
-browser_open_session(session_type="dynamic", headless=True)
+session = open_session(session_type="dynamic", headless=True)
+session_id = session.session_id
 
 # Navigate and interact
-browser_navigate(url="https://example.com/login")
-browser_type(selector="#username", text="user@example.com")
-browser_type(selector="#password", text="secret")
-browser_click(selector="button[type='submit']")
+browser_navigate(url="https://example.com/login", session_id=session_id)
+browser_type(selector="#username", text="user@example.com", session_id=session_id)
+browser_type(selector="#password", text="secret", session_id=session_id)
+browser_click(selector="button[type='submit']", session_id=session_id)
 
-# Take screenshot
-browser_screenshot(full_page=True)
+# Execute JavaScript
+result = browser_evaluate(expression="document.title", session_id=session_id)
+
+# Take screenshot (returns native ImageContent)
+screenshot(url="https://example.com/dashboard", session_id=session_id)
 
 # Close session
-browser_close_session()
+close_session(session_id=session_id)
 ```
 
 ### Bulk Operations
 
 ```python
 # Fetch multiple URLs concurrently
-bulk_get(
+results = bulk_get(
     urls=[
         "https://example.com/page1",
         "https://example.com/page2",
         "https://example.com/page3"
     ],
-    impersonate="chrome"
+    impersonate="chrome",
+    extraction_type="markdown"
 )
+# results is a list of ResponseModel objects
+```
+
+### Advanced Parsing
+
+```python
+# Parse HTML and use CSS/XPath selectors
+parse_raw_html(html="<html>...</html>")
+
+# Find elements with CSS
+elements = css(selector=".product-card", limit=10)
+
+# Find similar elements
+similar_items = similar(css_selector=".product-card:first-child")
+
+# Find by text or regex
+exact_match = find_text(text="Add to Cart", tag="button")
+regex_match = find_regex(pattern=r"\$\d+\.\d{2}")
 ```
 
 ## Architecture
@@ -229,18 +255,85 @@ pytest
 
 ## Comparison with Other MCP Servers
 
-| Feature | Scrapling MCP | Playwright MCP | Scrapling Official MCP |
-|---------|---------------|----------------|------------------------|
+| Feature | Scrapling MCP Extended | Playwright MCP | Scrapling Official MCP |
+|---------|------------------------|----------------|------------------------|
 | HTTP fetching | ✅ | ❌ | ✅ |
 | Dynamic browser | ✅ | ✅ | ✅ |
 | Anti-bot bypass | ✅ | ❌ | ✅ |
 | CSS pre-filtering | ✅ | ❌ | ✅ |
 | Browser interaction | ✅ | ✅ | ❌ |
-| Screenshots | ✅ | ✅ | ✅ |
+| Screenshots (native) | ✅ | ✅ | ✅ |
 | JavaScript evaluation | ✅ | ✅ | ❌ |
 | Bulk operations | ✅ | ❌ | ✅ |
 | Adaptive tracking | ✅ | ❌ | ✅ |
-| Total tools | 31 | ~50 | 10 |
+| Prompt injection protection | ✅ | ❌ | ✅ |
+| SSRF protection | ✅ | ❌ | ✅ |
+| Total tools | 27 | ~50 | 10 |
+
+## Publishing to PyPI
+
+This project uses [PyPI Trusted Publishers](https://docs.pypi.org/trusted-publishers/) with GitHub Actions for secure, token-free publishing.
+
+### How It Works
+
+1. **GitHub Actions Workflow**: The `.github/workflows/publish.yml` workflow runs when a new release is published
+2. **OIDC Authentication**: GitHub Actions uses OpenID Connect (OIDC) to prove its identity to PyPI
+3. **Trusted Publisher**: PyPI verifies that the request comes from the authorized GitHub repository and workflow
+4. **Automatic Publish**: The package is built and uploaded to PyPI without needing API tokens
+
+### Setup (One-Time)
+
+1. **Configure Pending Publisher on PyPI**:
+   - Go to https://pypi.org/manage/account/publishing/
+   - Fill in the form:
+     - **PyPI Project Name**: `scrapling-mcp`
+     - **Owner**: `iscodev0`
+     - **Repository name**: `scrapling-mcp`
+     - **Workflow name**: `publish.yml`
+     - **Environment name**: `pypi`
+
+2. **Create GitHub Environment**:
+   - Go to your repository Settings → Environments
+   - Click "New environment"
+   - Name it `pypi`
+   - (Optional) Add protection rules like required reviewers
+
+### Publishing a New Version
+
+1. **Update version** in `pyproject.toml`:
+   ```toml
+   version = "0.3.0"
+   ```
+
+2. **Update CHANGELOG.md** with the new version
+
+3. **Commit and push**:
+   ```bash
+   git add -A
+   git commit -m "chore: bump version to 0.3.0"
+   git push origin main
+   ```
+
+4. **Create a GitHub Release**:
+   ```bash
+   gh release create v0.3.0 --title "v0.3.0" --notes "Release notes here"
+   ```
+   
+   Or use the GitHub UI: https://github.com/iscodev0/scrapling-mcp/releases/new
+
+5. **Automatic Publishing**: The workflow will automatically:
+   - Build the package (sdist and wheel)
+   - Publish to PyPI using OIDC authentication
+   - The new version will be available at https://pypi.org/project/scrapling-mcp/
+
+### Why Trusted Publishing?
+
+- **No API tokens**: Eliminates the risk of token leakage
+- **Secure**: Uses OIDC for cryptographic proof of identity
+- **Automated**: No manual upload steps
+- **Auditable**: All publishes are tied to specific GitHub releases
+
+For more information, see the [PyPI Trusted Publishers documentation](https://docs.pypi.org/trusted-publishers/).
 
 ## License
 
