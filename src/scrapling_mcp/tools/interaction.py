@@ -38,8 +38,8 @@ async def _get_page_content(page: Any) -> str:
     return await page.content()
 
 
-async def _wait_for_networkidle(page: Any, timeout: int = 5000):
-    """Wait for network to be idle."""
+async def _wait_for_networkidle(page: Any, timeout: int = 3000):
+    """Wait for network to be idle (optimized timeout)."""
     try:
         await page.wait_for_load_state("networkidle", timeout=timeout)
     except Exception:
@@ -47,15 +47,15 @@ async def _wait_for_networkidle(page: Any, timeout: int = 5000):
 
 
 async def _wait_for_page_stability(page: Any, load_dom: bool = True, network_idle: bool = False):
-    """Wait for page stability."""
+    """Wait for page stability (optimized timeouts)."""
     if load_dom:
         try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
+            await page.wait_for_load_state("domcontentloaded", timeout=3000)
         except Exception:
             pass
     
     if network_idle:
-        await _wait_for_networkidle(page, timeout=5000)
+        await _wait_for_networkidle(page, timeout=3000)
 
 
 class CloudflareBypassSession:
@@ -77,76 +77,98 @@ class CloudflareBypassSession:
         
         return self._pages[session_id]
     
-    async def cloudflare_solver(self, page: Any) -> None:
+    async def cloudflare_solver(self, page: Any, max_attempts: int = 3) -> None:
         """
         Solve the cloudflare challenge displayed on the playwright page.
-        Replicates Scrapling's _cloudflare_solver for async use.
+        Optimized version with faster detection and fewer wait cycles.
         """
-        await _wait_for_networkidle(page, timeout=5000)
-        page_content = await _get_page_content(page)
-        challenge_type = _detect_cloudflare(page_content)
-        
-        if not challenge_type:
-            return None
-        
-        if challenge_type == "non-interactive":
-            # Non-interactive challenge: just wait
-            while "<title>Just a moment...</title>" in (await _get_page_content(page)):
-                await page.wait_for_timeout(1000)
-                await page.wait_for_load_state()
-            return None
-        
-        else:
-            # Interactive challenge: need to click the checkbox
-            box_selector = "#cf_turnstile div, #cf-turnstile div, .turnstile>div>div"
-            
-            if challenge_type != "embedded":
-                box_selector = ".main-content p+div>div>div"
-                while "Verifying you are human." in (await _get_page_content(page)):
-                    await page.wait_for_timeout(500)
-            
-            outer_box = {}
-            iframe = page.frame(url=__CF_PATTERN__)
-            
-            if iframe is not None:
-                await _wait_for_page_stability(iframe, True, False)
-                
-                frame_el = await iframe.frame_element()
-                if challenge_type != "embedded":
-                    while not await frame_el.is_visible():
-                        await page.wait_for_timeout(500)
-                
-                outer_box = await frame_el.bounding_box()
-            
-            if not iframe or not outer_box:
-                if "<title>Just a moment...</title>" not in (await _get_page_content(page)):
-                    return None
-                
-                outer_box = await page.locator(box_selector).last.bounding_box()
-            
-            # Calculate the Captcha coordinates
-            captcha_x = outer_box["x"] + randint(26, 28)
-            captcha_y = outer_box["y"] + randint(25, 27)
-            
-            # Click the captcha
-            await page.mouse.click(captcha_x, captcha_y, delay=randint(100, 200), button="left")
-            await _wait_for_networkidle(page)
-            
-            if challenge_type != "embedded":
-                attempts = 0
-                while "<title>Just a moment...</title>" in (await _get_page_content(page)):
-                    if attempts >= 100:
-                        break
-                    await page.wait_for_timeout(100)
-                    attempts += 1
-            
-            await _wait_for_page_stability(page, True, False)
-            
-            if "<title>Just a moment...</title>" not in (await _get_page_content(page)):
+        for attempt in range(max_attempts):
+            # Quick check for Cloudflare challenge
+            title = await page.title()
+            if "just a moment" not in title.lower():
                 return None
+            
+            # Wait for network to settle (shorter timeout)
+            await _wait_for_networkidle(page, timeout=3000)
+            page_content = await _get_page_content(page)
+            challenge_type = _detect_cloudflare(page_content)
+            
+            if not challenge_type:
+                return None
+            
+            if challenge_type == "non-interactive":
+                # Non-interactive challenge: just wait (optimized loop)
+                wait_count = 0
+                while wait_count < 30:  # Max 30 seconds
+                    await page.wait_for_timeout(1000)
+                    new_title = await page.title()
+                    if "just a moment" not in new_title.lower():
+                        return None
+                    wait_count += 1
+                return None
+            
             else:
-                # Recursive call if still present
-                return await self.cloudflare_solver(page)
+                # Interactive challenge: need to click the checkbox
+                box_selector = "#cf_turnstile div, #cf-turnstile div, .turnstile>div>div"
+                
+                if challenge_type != "embedded":
+                    box_selector = ".main-content p+div>div>div"
+                    # Quick wait for verification text
+                    verify_count = 0
+                    while "Verifying you are human." in page_content and verify_count < 10:
+                        await page.wait_for_timeout(300)
+                        page_content = await _get_page_content(page)
+                        verify_count += 1
+                
+                outer_box = {}
+                iframe = page.frame(url=__CF_PATTERN__)
+                
+                if iframe is not None:
+                    await _wait_for_page_stability(iframe, True, False)
+                    
+                    frame_el = await iframe.frame_element()
+                    if challenge_type != "embedded":
+                        # Faster visibility check
+                        vis_count = 0
+                        while not await frame_el.is_visible() and vis_count < 10:
+                            await page.wait_for_timeout(300)
+                            vis_count += 1
+                    
+                    outer_box = await frame_el.bounding_box()
+                
+                if not iframe or not outer_box:
+                    new_title = await page.title()
+                    if "just a moment" not in new_title.lower():
+                        return None
+                    
+                    outer_box = await page.locator(box_selector).last.bounding_box()
+                
+                # Calculate the Captcha coordinates
+                captcha_x = outer_box["x"] + randint(26, 28)
+                captcha_y = outer_box["y"] + randint(25, 27)
+                
+                # Click the captcha
+                await page.mouse.click(captcha_x, captcha_y, delay=randint(100, 200), button="left")
+                await _wait_for_networkidle(page, timeout=3000)
+                
+                if challenge_type != "embedded":
+                    # Faster wait loop after click
+                    post_click_count = 0
+                    while post_click_count < 50:  # Max 5 seconds
+                        await page.wait_for_timeout(100)
+                        new_title = await page.title()
+                        if "just a moment" not in new_title.lower():
+                            return None
+                        post_click_count += 1
+                
+                await _wait_for_page_stability(page, True, False)
+                
+                final_title = await page.title()
+                if "just a moment" not in final_title.lower():
+                    return None
+                # Otherwise retry
+        
+        return None
     
     async def close(self):
         """Close all pages and the session."""
@@ -245,7 +267,7 @@ class InteractionTools:
 
     async def browser_navigate(self, session_id: str, url: str) -> dict[str, Any]:
         """
-        Navigate to a URL in the browser session.
+        Navigate to a URL in the browser session (optimized for speed).
         
         For sessions created with open_session_with_bypass, automatically
         solves Cloudflare challenges if detected.
@@ -256,22 +278,22 @@ class InteractionTools:
         """
         page = await self._get_page(session_id)
         
-        # Navigate to the URL
-        await page.goto(url, wait_until="networkidle", timeout=60000)
+        # Navigate with faster wait_until (domcontentloaded instead of networkidle)
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         
         # Check if this is a Cloudflare bypass session
         cloudflare_solved = False
         if session_id in self._cloudflare_sessions:
             wrapper = self._cloudflare_sessions[session_id]
             if wrapper.solve_cloudflare:
-                # Check if we're on a Cloudflare challenge page
+                # Quick check for Cloudflare challenge
                 title = await page.title()
                 if "just a moment" in title.lower() or "attention required" in title.lower():
                     await wrapper.cloudflare_solver(page)
                     cloudflare_solved = True
                     
-                    # Wait for stability after solving
-                    await page.wait_for_load_state("networkidle", timeout=30000)
+                    # Faster stability check after solving
+                    await page.wait_for_load_state("domcontentloaded", timeout=10000)
         
         return {
             "url": page.url,
@@ -280,13 +302,13 @@ class InteractionTools:
         }
 
     async def browser_navigate_back(self, session_id: str) -> dict[str, Any]:
-        """Go back to the previous page.
+        """Go back to the previous page (optimized for speed).
         
         :param session_id: ID of the session to use
         :return: Dict with final URL and title
         """
         page = await self._get_page(session_id)
-        await page.go_back(wait_until="networkidle")
+        await page.go_back(wait_until="domcontentloaded", timeout=30000)
         
         return {
             "url": page.url,
@@ -371,19 +393,24 @@ class InteractionTools:
         await page.wait_for_timeout(milliseconds)
         return {"status": "waited", "milliseconds": str(milliseconds)}
 
-    async def browser_snapshot(self, session_id: str) -> dict[str, Any]:
-        """Get a snapshot of the current page.
+    async def browser_snapshot(self, session_id: str, include_content: bool = False) -> dict[str, Any]:
+        """Get a snapshot of the current page (optimized for speed).
         
         :param session_id: ID of the session to use
-        :return: Dict with URL, title, and text content
+        :param include_content: Whether to include full HTML content (slower). Default False for speed.
+        :return: Dict with URL, title, and optionally content
         """
         page = await self._get_page(session_id)
         
-        return {
+        result = {
             "url": page.url,
             "title": await page.title(),
-            "content": await page.content(),
         }
+        
+        if include_content:
+            result["content"] = await page.content()
+        
+        return result
 
     async def close_session_with_bypass(self, session_id: str) -> dict[str, str]:
         """
