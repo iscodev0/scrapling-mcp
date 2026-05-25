@@ -1,8 +1,11 @@
+LICENSE
+README.md
 pyproject.toml
 src/scrapling_mcp/__init__.py
 src/scrapling_mcp/__main__.py
 src/scrapling_mcp/browser.py
 src/scrapling_mcp/cli.py
+src/scrapling_mcp/py.typed
 src/scrapling_mcp/server.py
 src/scrapling_mcp.egg-info/PKG-INFO
 src/scrapling_mcp.egg-info/SOURCES.txt
