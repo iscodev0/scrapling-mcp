@@ -1,3 +1,248 @@
-# scrapling-mcp
-# scrapling-mcp
-# scrapling-mcp
+# Scrapling MCP Server
+
+[![PyPI version](https://img.shields.io/pypi/v/scrapling-mcp.svg)](https://pypi.org/project/scrapling-mcp/)
+[![Python versions](https://img.shields.io/pypi/pyversions/scrapling-mcp.svg)](https://pypi.org/project/scrapling-mcp/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A Model Context Protocol (MCP) server that provides browser automation and web scraping capabilities using [Scrapling](https://github.com/D4Vinci/Scrapling). This server enables LLMs to interact with web pages, bypass anti-bot systems, and extract data with precision.
+
+## Features
+
+### 🚀 Fetching Tools (4)
+- **`get`**: Fast HTTP requests with browser fingerprint impersonation, TLS fingerprinting, and HTTP/3 support
+- **`fetch`**: Dynamic content fetching with Chromium browser via Playwright
+- **`stealthy_fetch`**: Stealth browser that bypasses Cloudflare Turnstile/Interstitial and anti-bot systems
+- **`bulk_get`**: Concurrent multi-URL fetching with async HTTP requests
+
+### 🔍 Parsing Tools (7)
+- **`css`**: Find elements using CSS selectors
+- **`xpath`**: Find elements using XPath expressions
+- **`find`**: Find elements by tag name and/or text content regex
+- **`find_text`**: Find elements by exact text content match
+- **`find_regex`**: Find elements whose text content matches a regex pattern
+- **`similar`**: Find structurally similar elements using Scrapling's intelligent algorithms
+- **`parse_raw_html`**: Parse raw HTML content directly
+
+### 📤 Extraction Tools (6)
+- **`get_text`**: Extract clean text content (ignores script/style tags)
+- **`get_html`**: Extract raw HTML content
+- **`get_markdown`**: Extract content as Markdown (AI-friendly format)
+- **`get_links`**: Extract all links with href and text
+- **`get_tables`**: Extract HTML tables as structured data
+- **`get_attributes`**: Extract specific attributes from elements
+
+### 🎮 Browser Interaction Tools (14)
+- **`browser_open_session`**: Open persistent browser session (dynamic or stealthy)
+- **`browser_close_session`**: Close browser session and free resources
+- **`browser_list_sessions`**: List all active browser sessions
+- **`browser_navigate`**: Navigate to URL
+- **`browser_navigate_back`**: Go back in browser history
+- **`browser_click`**: Click elements
+- **`browser_type`**: Type text into input fields
+- **`browser_press_key`**: Press keyboard keys
+- **`browser_hover`**: Hover over elements
+- **`browser_select_option`**: Select dropdown options
+- **`browser_evaluate`**: Execute JavaScript expressions
+- **`browser_screenshot`**: Take screenshots (PNG/JPEG)
+- **`browser_wait`**: Wait for elements or text to appear
+- **`browser_snapshot`**: Get structured page snapshot (URL, title, text content)
+
+## Installation
+
+### From PyPI (recommended)
+
+```bash
+pip install scrapling-mcp
+```
+
+### From source
+
+```bash
+git clone https://github.com/iscodev0/scrapling-mcp.git
+cd scrapling-mcp
+pip install -e .
+```
+
+### Browser dependencies
+
+After installation, install browser dependencies:
+
+```bash
+scrapling install
+```
+
+## Usage
+
+### Stdio Transport (for Claude Desktop, Cursor, etc.)
+
+Add to your MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "scrapling-mcp": {
+      "command": "scrapling-mcp"
+    }
+  }
+}
+```
+
+### HTTP Transport (for remote clients)
+
+Start the server:
+
+```bash
+scrapling-mcp --http --port 4891
+```
+
+Configure your MCP client:
+
+```json
+{
+  "mcpServers": {
+    "scrapling-mcp": {
+      "url": "http://localhost:4891/mcp"
+    }
+  }
+}
+```
+
+## Examples
+
+### Basic Scraping
+
+```python
+# Fetch a page with HTTP request
+get(url="https://example.com", impersonate="chrome")
+
+# Extract text with CSS selector
+get_text(css_selector=".article-content")
+
+# Extract as Markdown
+get_markdown(main_content_only=True)
+```
+
+### Anti-Bot Bypass
+
+```python
+# Fetch Cloudflare-protected site
+stealthy_fetch(
+    url="https://protected-site.com",
+    solve_cloudflare=True,
+    headless=True
+)
+```
+
+### Interactive Browser Automation
+
+```python
+# Open browser session
+browser_open_session(session_type="dynamic", headless=True)
+
+# Navigate and interact
+browser_navigate(url="https://example.com/login")
+browser_type(selector="#username", text="user@example.com")
+browser_type(selector="#password", text="secret")
+browser_click(selector="button[type='submit']")
+
+# Take screenshot
+browser_screenshot(full_page=True)
+
+# Close session
+browser_close_session()
+```
+
+### Bulk Operations
+
+```python
+# Fetch multiple URLs concurrently
+bulk_get(
+    urls=[
+        "https://example.com/page1",
+        "https://example.com/page2",
+        "https://example.com/page3"
+    ],
+    impersonate="chrome"
+)
+```
+
+## Architecture
+
+The server combines two powerful approaches:
+
+1. **Playwright MCP Architecture**: Interactive browser automation with persistent sessions, navigation, clicking, typing, screenshots, and JavaScript evaluation
+2. **Scrapling Engine**: Anti-bot bypass, CSS pre-filtering, adaptive element tracking, and intelligent similarity algorithms
+
+This combination provides both the interactivity of a full browser automation tool and the precision of a web scraping framework.
+
+## Configuration
+
+### CLI Options
+
+```bash
+scrapling-mcp --help
+
+Options:
+  --http          Use Streamable HTTP transport instead of stdio
+  --host HOST     Host to bind to when using HTTP (default: 0.0.0.0)
+  --port PORT     Port to listen on when using HTTP (default: 4891)
+```
+
+### Environment Variables
+
+The server respects Scrapling's environment variables for proxy configuration, browser settings, and more. See [Scrapling documentation](https://github.com/D4Vinci/Scrapling) for details.
+
+## Development
+
+### Setup
+
+```bash
+git clone https://github.com/iscodev0/scrapling-mcp.git
+cd scrapling-mcp
+pip install -e ".[dev]"
+```
+
+### Code Quality
+
+```bash
+# Format code
+black src/
+
+# Lint code
+ruff check src/
+
+# Type checking
+mypy src/
+
+# Run tests
+pytest
+```
+
+## Comparison with Other MCP Servers
+
+| Feature | Scrapling MCP | Playwright MCP | Scrapling Official MCP |
+|---------|---------------|----------------|------------------------|
+| HTTP fetching | ✅ | ❌ | ✅ |
+| Dynamic browser | ✅ | ✅ | ✅ |
+| Anti-bot bypass | ✅ | ❌ | ✅ |
+| CSS pre-filtering | ✅ | ❌ | ✅ |
+| Browser interaction | ✅ | ✅ | ❌ |
+| Screenshots | ✅ | ✅ | ✅ |
+| JavaScript evaluation | ✅ | ✅ | ❌ |
+| Bulk operations | ✅ | ❌ | ✅ |
+| Adaptive tracking | ✅ | ❌ | ✅ |
+| Total tools | 31 | ~50 | 10 |
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Acknowledgments
+
+- [Scrapling](https://github.com/D4Vinci/Scrapling) - The powerful web scraping framework this server is built on
+- [Playwright MCP](https://github.com/microsoft/playwright-mcp) - Inspiration for the browser automation architecture
+- [Model Context Protocol](https://modelcontextprotocol.io/) - The protocol that makes this possible
