@@ -1,205 +1,151 @@
-from __future__ import annotations
+"""Interactive browser tools that work with Scrapling sessions."""
 
-import base64
-from typing import Any, Optional
-
+from typing import Any
 from scrapling.core.ai import ScraplingMCPServer
-from scrapling.parser import Selector
 
 
 class InteractionTools:
-    def __init__(self, official_server: ScraplingMCPServer):
-        self._server = official_server
-        self._pages: dict[str, Any] = {}
+    """Tools for interactive browser automation using Scrapling sessions."""
+
+    def __init__(self, server: ScraplingMCPServer):
+        self.server = server
+        self._pages: dict[str, Any] = {}  # session_id -> Playwright Page
 
     async def _get_page(self, session_id: str) -> Any:
-        entry = self._server._get_session(session_id, expected_type=None)
-        
+        """Get or create a persistent page for a session."""
         if session_id not in self._pages:
-            async def capture_page(page: Any) -> None:
-                self._pages[session_id] = page
+            # Get the session entry
+            entry = self.server._sessions.get(session_id)
+            if not entry:
+                raise ValueError(f"Session '{session_id}' not found")
             
-            await entry.session.fetch(
-                "about:blank",
-                page_action=capture_page,
-                timeout=5000,
-            )
+            session = entry.session
+            if not session.context:
+                raise ValueError(f"Session '{session_id}' has no browser context")
+            
+            # Create a new page from the context
+            page = await session.context.new_page()
+            self._pages[session_id] = page
         
-        page = self._pages.get(session_id)
-        if page is None:
-            raise ValueError(f"Failed to capture page for session '{session_id}'")
-        
-        return page
+        return self._pages[session_id]
 
-    async def browser_navigate(
-        self,
-        url: str,
-        session_id: str,
-        wait_until: str = "networkidle",
-        timeout: int = 30000,
-    ) -> dict[str, Any]:
-        """Navigate to a URL in an existing browser session.
-        Use this for interactive browsing workflows where you need to click, type, or interact with pages.
+    async def browser_navigate(self, session_id: str, url: str) -> dict[str, Any]:
+        """Navigate to a URL in the browser session.
         
-        :param url: The URL to navigate to.
-        :param session_id: ID of an open browser session from open_session.
-        :param wait_until: When to consider navigation complete. One of: "load", "domcontentloaded", "networkidle", "commit".
-        :param timeout: Timeout in milliseconds for navigation.
+        :param session_id: ID of the session to use
+        :param url: URL to navigate to
+        :return: Dict with final URL and title
         """
         page = await self._get_page(session_id)
-        await page.goto(url, wait_until=wait_until, timeout=timeout)
-        
-        title = await page.title()
-        current_url = page.url
+        await page.goto(url, wait_until="networkidle")
         
         return {
-            "url": current_url,
-            "title": title,
-            "status": "navigated",
+            "url": page.url,
+            "title": await page.title(),
         }
 
-    async def browser_navigate_back(self, session_id: str) -> dict[str, str]:
-        """Go back to the previous page in browser history.
+    async def browser_navigate_back(self, session_id: str) -> dict[str, Any]:
+        """Go back to the previous page.
         
-        :param session_id: ID of an open browser session from open_session.
+        :param session_id: ID of the session to use
+        :return: Dict with final URL and title
         """
         page = await self._get_page(session_id)
-        await page.go_back()
-        return {"url": page.url, "status": "navigated_back"}
-
-    async def browser_click(
-        self,
-        selector: str,
-        session_id: str,
-        timeout: int = 5000,
-    ) -> dict[str, str]:
-        """Click an element in the browser. Use CSS selectors to target the element.
+        await page.go_back(wait_until="networkidle")
         
-        :param selector: CSS selector for the element to click.
-        :param session_id: ID of an open browser session from open_session.
-        :param timeout: Timeout in milliseconds to wait for the element.
+        return {
+            "url": page.url,
+            "title": await page.title(),
+        }
+
+    async def browser_click(self, session_id: str, selector: str) -> dict[str, str]:
+        """Click an element.
+        
+        :param session_id: ID of the session to use
+        :param selector: CSS selector of the element to click
+        :return: Dict with status
         """
         page = await self._get_page(session_id)
-        await page.click(selector, timeout=timeout)
-        return {"selector": selector, "status": "clicked"}
+        await page.click(selector)
+        return {"status": "clicked", "selector": selector}
 
-    async def browser_type(
-        self,
-        selector: str,
-        text: str,
-        session_id: str,
-        delay: int = 0,
-    ) -> dict[str, str]:
-        """Type text into an input element in the browser. Clears existing content first.
+    async def browser_type(self, session_id: str, selector: str, text: str) -> dict[str, str]:
+        """Type text into an input field.
         
-        :param selector: CSS selector for the input element.
-        :param text: Text to type into the element.
-        :param session_id: ID of an open browser session from open_session.
-        :param delay: Delay in milliseconds between keystrokes.
+        :param session_id: ID of the session to use
+        :param selector: CSS selector of the input field
+        :param text: Text to type
+        :return: Dict with status
         """
         page = await self._get_page(session_id)
-        await page.fill(selector, text, delay=delay)
-        return {"selector": selector, "status": "typed", "length": str(len(text))}
+        await page.fill(selector, text)
+        return {"status": "typed", "selector": selector, "length": str(len(text))}
 
-    async def browser_press_key(self, key: str, session_id: str) -> dict[str, str]:
-        """Press a keyboard key. Examples: 'Enter', 'Tab', 'Escape', 'ArrowDown', 'Control+a'.
+    async def browser_press_key(self, session_id: str, key: str) -> dict[str, str]:
+        """Press a keyboard key.
         
-        :param key: Key to press (e.g., 'Enter', 'Tab', 'Escape', 'ArrowDown').
-        :param session_id: ID of an open browser session from open_session.
+        :param session_id: ID of the session to use
+        :param key: Key to press (e.g., 'Enter', 'Tab', 'Escape')
+        :return: Dict with status
         """
         page = await self._get_page(session_id)
         await page.keyboard.press(key)
-        return {"key": key, "status": "pressed"}
+        return {"status": "pressed", "key": key}
 
-    async def browser_hover(self, selector: str, session_id: str) -> dict[str, str]:
-        """Hover over an element in the browser. Useful for triggering hover-based menus/tooltips.
+    async def browser_hover(self, session_id: str, selector: str) -> dict[str, str]:
+        """Hover over an element.
         
-        :param selector: CSS selector for the element to hover over.
-        :param session_id: ID of an open browser session from open_session.
+        :param session_id: ID of the session to use
+        :param selector: CSS selector of the element to hover
+        :return: Dict with status
         """
         page = await self._get_page(session_id)
         await page.hover(selector)
-        return {"selector": selector, "status": "hovered"}
+        return {"status": "hovered", "selector": selector}
 
-    async def browser_select_option(
-        self,
-        selector: str,
-        value: str,
-        session_id: str,
-    ) -> dict[str, str]:
-        """Select an option from a dropdown/select element by its value attribute.
+    async def browser_select_option(self, session_id: str, selector: str, value: str) -> dict[str, str]:
+        """Select an option from a dropdown.
         
-        :param selector: CSS selector for the select element.
-        :param value: Value attribute of the option to select.
-        :param session_id: ID of an open browser session from open_session.
+        :param session_id: ID of the session to use
+        :param selector: CSS selector of the select element
+        :param value: Value of the option to select
+        :return: Dict with status
         """
         page = await self._get_page(session_id)
         await page.select_option(selector, value)
-        return {"selector": selector, "value": value, "status": "selected"}
+        return {"status": "selected", "selector": selector, "value": value}
 
-    async def browser_evaluate(
-        self,
-        expression: str,
-        session_id: str,
-    ) -> Any:
-        """Evaluate a JavaScript expression in the browser context. Returns the result.
+    async def browser_evaluate(self, session_id: str, expression: str) -> Any:
+        """Execute JavaScript and return the result.
         
-        :param expression: JavaScript expression to evaluate.
-        :param session_id: ID of an open browser session from open_session.
+        :param session_id: ID of the session to use
+        :param expression: JavaScript expression to evaluate
+        :return: Result of the evaluation
         """
         page = await self._get_page(session_id)
-        result = await page.evaluate(expression)
-        return result
+        return await page.evaluate(expression)
 
-    async def browser_wait(
-        self,
-        selector: Optional[str] = None,
-        text: Optional[str] = None,
-        timeout: int = 30000,
-        session_id: str = None,
-    ) -> dict[str, str]:
-        """Wait for an element (by CSS selector) or text to appear on the page.
+    async def browser_wait(self, session_id: str, milliseconds: int = 1000) -> dict[str, str]:
+        """Wait for a specified time.
         
-        :param selector: CSS selector to wait for.
-        :param text: Text to wait for in the page body.
-        :param timeout: Timeout in milliseconds.
-        :param session_id: ID of an open browser session from open_session.
+        :param session_id: ID of the session to use
+        :param milliseconds: Time to wait in milliseconds
+        :return: Dict with status
         """
         page = await self._get_page(session_id)
-
-        if selector:
-            await page.wait_for_selector(selector, timeout=timeout)
-            return {"selector": selector, "status": "found"}
-        elif text:
-            await page.wait_for_function(
-                f"document.body.innerText.includes('{text}')",
-                timeout=timeout,
-            )
-            return {"text": text, "status": "found"}
-        else:
-            import asyncio
-            await asyncio.sleep(timeout / 1000)
-            return {"status": "waited", "ms": str(timeout)}
+        await page.wait_for_timeout(milliseconds)
+        return {"status": "waited", "milliseconds": str(milliseconds)}
 
     async def browser_snapshot(self, session_id: str) -> dict[str, Any]:
-        """Get a structured snapshot of the current browser page: URL, title, text content.
-        Also loads the page into the parser so you can use CSS/XPath/extraction tools on it.
+        """Get a snapshot of the current page.
         
-        :param session_id: ID of an open browser session from open_session.
+        :param session_id: ID of the session to use
+        :return: Dict with URL, title, and text content
         """
         page = await self._get_page(session_id)
         
-        html = await page.content()
-        parsed = Selector(html)
-        
-        title = await page.title()
-        url = page.url
-
-        text = parsed.get_all_text(ignore_tags=("script", "style")) if hasattr(parsed, "get_all_text") else ""
-
         return {
-            "url": url,
-            "title": title,
-            "text_content": text[:5000],
-            "html_length": len(html),
+            "url": page.url,
+            "title": await page.title(),
+            "content": await page.content(),
         }
