@@ -100,6 +100,16 @@ mcp.add_tool(
     title="browser_snapshot",
     description=_interaction_tools.browser_snapshot.__doc__,
 )
+mcp.add_tool(
+    _interaction_tools.open_session_with_bypass,
+    title="open_session_with_bypass",
+    description=_interaction_tools.open_session_with_bypass.__doc__,
+)
+mcp.add_tool(
+    _interaction_tools.close_session_with_bypass,
+    title="close_session_with_bypass",
+    description=_interaction_tools.close_session_with_bypass.__doc__,
+)
 
 # ── Parsing Tools (EXTENDED - not in official Scrapling MCP) ────────────────
 
