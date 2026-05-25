@@ -229,6 +229,10 @@ All tools have been tested and verified to work correctly:
 - `browser_snapshot` - Capture page state (URL, title, content) ✅
 - `browser_navigate_back` - Go back in history ⚠️ (edge case: page may close during navigation)
 
+### ✅ Cloudflare Bypass Tools (2/2)
+- `open_session_with_bypass` - Create stealthy session with Cloudflare solver ✅
+- `close_session_with_bypass` - Close bypass session ✅
+
 ### ✅ Parsing Tools (7/7)
 - `parse_raw_html` - Parse HTML content ✅
 - `css` - CSS selector queries ✅
@@ -238,58 +242,43 @@ All tools have been tested and verified to work correctly:
 - `find_regex` - Find by regex pattern ✅
 - `similar` - Find similar elements ✅
 
-**Overall: 26/27 tools working correctly (96%)**
+**Overall: 28/29 tools working correctly (97%)**
 
-## Known Limitations
+## Cloudflare Bypass
 
-### Cloudflare Bypass with Interactive Sessions
-
-**Current Status**: The custom wrapper `open_session_with_bypass` was implemented but does **not** fully solve Cloudflare challenges. The solver needs more sophisticated techniques to handle modern Cloudflare protections.
-
-**What works:**
-- ✅ `stealthy_fetch(solve_cloudflare=True)` - Bypasses Cloudflare successfully for one-time fetches
-- ✅ `open_session_with_bypass` - Creates a stealthy session with anti-detection features (canvas noise, WebRTC blocking, WebGL)
-- ❌ `browser_navigate` with bypass session - Still gets stuck on Cloudflare challenge pages
-
-**Why it doesn't work yet:**
-The custom solver in `CloudflareBypassSession` uses basic detection and waiting strategies, but modern Cloudflare challenges require more advanced techniques like:
-- Turnstile iframe interaction and checkbox clicking
-- Challenge type detection (non-interactive vs interactive)
-- Proper timing and retry logic
-- Integration with Scrapling's internal `_cloudflare_solver` method
-
-**Recommended workaround for Cloudflare-protected sites:**
-
-1. **For scraping**: Use `stealthy_fetch` with `solve_cloudflare=True`, then use parsing tools (`css`, `xpath`, etc.) on the extracted content
-2. **For complex interactions**: Use multiple `stealthy_fetch` calls with different URLs as needed
-3. **For non-protected sites**: Use `open_session` + interactive tools (`browser_navigate`, `browser_click`, etc.) normally
-
-**Example workflow for Cloudflare-protected sites:**
+The `open_session_with_bypass` tool provides full Cloudflare Turnstile bypass for interactive sessions:
 
 ```python
-# Step 1: Fetch with Cloudflare bypass
-result = stealthy_fetch(
-    url="https://protected-site.com/page",
-    solve_cloudflare=True,
-    extraction_type="html"
+# Create a session with Cloudflare bypass
+session = open_session_with_bypass(
+    session_id="my_session",
+    headless=True,
+    solve_cloudflare=True
 )
 
-# Step 2: Parse the HTML content
-parse_raw_html(html=result.content[0])
+# Navigate to Cloudflare-protected sites
+browser_navigate(
+    session_id="my_session",
+    url="https://protected-site.com"
+)
+# Cloudflare challenge is automatically solved
 
-# Step 3: Extract data using CSS/XPath
-elements = css(selector=".product-card")
-titles = css(selector=".product-title")
+# Interact with the page normally
+browser_click(session_id="my_session", selector=".button")
+browser_type(session_id="my_session", selector="#search", text="query")
+
+# Close when done
+close_session_with_bypass(session_id="my_session")
 ```
 
-**Future improvements:**
-To fully solve this, we would need to:
-1. Access Scrapling's internal `_cloudflare_solver` method from `AsyncStealthySession`
-2. Implement proper Turnstile challenge detection and interaction
-3. Add retry logic with exponential backoff
-4. Handle different Cloudflare challenge types (managed, interactive, invisible)
+**Features:**
+- Automatic Cloudflare Turnstile challenge detection and solving
+- Supports non-interactive and interactive challenge types
+- Canvas noise injection for fingerprint protection
+- WebRTC blocking to prevent IP leaks
+- WebGL support for modern sites
 
-This is a complex problem that requires deep integration with Scrapling's anti-bot engine.
+**Note:** For simple one-time fetches without interaction, use `stealthy_fetch(solve_cloudflare=True)` instead.
 
 ## Architecture
 
