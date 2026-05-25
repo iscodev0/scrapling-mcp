@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-25
+
+### Added
+- **Cloudflare Bypass for Interactive Sessions**: New `open_session_with_bypass` and `close_session_with_bypass` tools
+  - Automatically solves Cloudflare Turnstile challenges (both non-interactive and interactive types)
+  - Replicates Scrapling's internal `_cloudflare_solver` logic for async browser sessions
+  - Includes anti-detection features: canvas noise injection, WebRTC blocking, WebGL support
+  - Enables full interactive automation on Cloudflare-protected sites
+- Cloudflare challenge detection supporting: non-interactive, managed, interactive, and embedded types
+- Turnstile iframe detection and automatic checkbox clicking with randomized coordinates
+
+### Fixed
+- Async/await handling in Cloudflare solver (`is_visible()` now properly awaited)
+- Frame element interaction for Turnstile challenges
+
+### Changed
+- Updated README with Cloudflare Bypass section and usage examples
+- Test results: 28/29 tools working (97% success rate)
+
 ## [0.2.0] - 2026-05-25
 
 ### Changed
