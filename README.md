@@ -244,12 +244,21 @@ All tools have been tested and verified to work correctly:
 
 ### Cloudflare Bypass with Interactive Sessions
 
-The official Scrapling MCP's `open_session` does **not** support `solve_cloudflare`. This means:
+**Current Status**: The custom wrapper `open_session_with_bypass` was implemented but does **not** fully solve Cloudflare challenges. The solver needs more sophisticated techniques to handle modern Cloudflare protections.
 
-- ✅ `stealthy_fetch(solve_cloudflare=True)` - Bypasses Cloudflare successfully
-- ❌ `open_session` + `browser_navigate` - Gets stuck on Cloudflare challenge pages
+**What works:**
+- ✅ `stealthy_fetch(solve_cloudflare=True)` - Bypasses Cloudflare successfully for one-time fetches
+- ✅ `open_session_with_bypass` - Creates a stealthy session with anti-detection features (canvas noise, WebRTC blocking, WebGL)
+- ❌ `browser_navigate` with bypass session - Still gets stuck on Cloudflare challenge pages
 
-**Workaround for Cloudflare-protected sites:**
+**Why it doesn't work yet:**
+The custom solver in `CloudflareBypassSession` uses basic detection and waiting strategies, but modern Cloudflare challenges require more advanced techniques like:
+- Turnstile iframe interaction and checkbox clicking
+- Challenge type detection (non-interactive vs interactive)
+- Proper timing and retry logic
+- Integration with Scrapling's internal `_cloudflare_solver` method
+
+**Recommended workaround for Cloudflare-protected sites:**
 
 1. **For scraping**: Use `stealthy_fetch` with `solve_cloudflare=True`, then use parsing tools (`css`, `xpath`, etc.) on the extracted content
 2. **For complex interactions**: Use multiple `stealthy_fetch` calls with different URLs as needed
@@ -273,7 +282,14 @@ elements = css(selector=".product-card")
 titles = css(selector=".product-title")
 ```
 
-This limitation exists because the official Scrapling MCP's session management doesn't expose the `solve_cloudflare` parameter. Future versions may address this by implementing custom session handling.
+**Future improvements:**
+To fully solve this, we would need to:
+1. Access Scrapling's internal `_cloudflare_solver` method from `AsyncStealthySession`
+2. Implement proper Turnstile challenge detection and interaction
+3. Add retry logic with exponential backoff
+4. Handle different Cloudflare challenge types (managed, interactive, invisible)
+
+This is a complex problem that requires deep integration with Scrapling's anti-bot engine.
 
 ## Architecture
 

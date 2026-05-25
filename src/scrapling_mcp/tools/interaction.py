@@ -1,9 +1,61 @@
 """Interactive browser tools with Cloudflare bypass support."""
 
 import asyncio
+import re
+from random import randint
 from typing import Any, Dict, Optional
 from scrapling.core.ai import ScraplingMCPServer
 from scrapling.fetchers import AsyncStealthySession
+from scrapling.parser import Selector
+
+# Cloudflare challenge URL pattern
+__CF_PATTERN__ = re.compile(r"^https?://challenges\.cloudflare\.com/cdn-cgi/challenge-platform/.*")
+
+
+def _detect_cloudflare(page_content: str) -> str | None:
+    """
+    Detect the type of Cloudflare challenge present in the provided page content.
+    """
+    challenge_types = (
+        "non-interactive",
+        "managed",
+        "interactive",
+    )
+    for ctype in challenge_types:
+        if f"cType: '{ctype}'" in page_content:
+            return ctype
+
+    # Check if turnstile captcha is embedded inside the page
+    selector = Selector(content=page_content)
+    if selector.css('script[src*="challenges.cloudflare.com/turnstile/v"]'):
+        return "embedded"
+
+    return None
+
+
+async def _get_page_content(page: Any) -> str:
+    """Get page content asynchronously."""
+    return await page.content()
+
+
+async def _wait_for_networkidle(page: Any, timeout: int = 5000):
+    """Wait for network to be idle."""
+    try:
+        await page.wait_for_load_state("networkidle", timeout=timeout)
+    except Exception:
+        pass
+
+
+async def _wait_for_page_stability(page: Any, load_dom: bool = True, network_idle: bool = False):
+    """Wait for page stability."""
+    if load_dom:
+        try:
+            await page.wait_for_load_state("domcontentloaded", timeout=5000)
+        except Exception:
+            pass
+    
+    if network_idle:
+        await _wait_for_networkidle(page, timeout=5000)
 
 
 class CloudflareBypassSession:
@@ -25,50 +77,90 @@ class CloudflareBypassSession:
         
         return self._pages[session_id]
     
-    async def solve_cloudflare_challenge(self, page: Any, max_attempts: int = 15) -> bool:
+    async def cloudflare_solver(self, page: Any) -> None:
         """
-        Solve Cloudflare challenge on the current page.
+        Solve the cloudflare challenge displayed on the playwright page.
+        Replicates Scrapling's _cloudflare_solver for async use.
+        """
+        print(f"[DEBUG] Starting Cloudflare solver")
+        await _wait_for_networkidle(page, timeout=5000)
+        page_content = await _get_page_content(page)
+        challenge_type = _detect_cloudflare(page_content)
+        print(f"[DEBUG] Detected challenge type: {challenge_type}")
         
-        Handles both non-interactive (auto-solve) and interactive (Turnstile) challenges.
-        """
-        for attempt in range(max_attempts):
-            title = await page.title()
-            
+        if not challenge_type:
+            print(f"[DEBUG] No Cloudflare challenge detected")
+            return None
+        
+        if challenge_type == "non-interactive":
             # Non-interactive challenge: just wait
-            if "just a moment" in title.lower():
-                await asyncio.sleep(2)
-                
-                # Check if it resolved
-                new_title = await page.title()
-                if "just a moment" not in new_title.lower():
-                    return True
-                continue
-            
-            # Interactive Turnstile: try to click the checkbox
-            try:
-                # Look for Turnstile iframe
-                frames = page.frames
-                for frame in frames:
-                    if "challenges.cloudflare.com" in frame.url:
-                        # Try to find and click the checkbox
-                        checkbox = frame.locator('input[type="checkbox"]')
-                        if await checkbox.count() > 0:
-                            await checkbox.click(timeout=5000)
-                            await asyncio.sleep(3)
-                            
-                            # Check if solved
-                            new_title = await page.title()
-                            if "just a moment" not in new_title.lower():
-                                return True
-                        break
-            except Exception:
-                pass
-            
-            await asyncio.sleep(1)
+            print(f"[DEBUG] Non-interactive challenge, waiting...")
+            while "<title>Just a moment...</title>" in (await _get_page_content(page)):
+                await page.wait_for_timeout(1000)
+                await page.wait_for_load_state()
+            print(f"[DEBUG] Non-interactive challenge solved")
+            return None
         
-        # Final check
-        final_title = await page.title()
-        return "just a moment" not in final_title.lower()
+        else:
+            # Interactive challenge: need to click the checkbox
+            print(f"[DEBUG] Interactive challenge detected: {challenge_type}")
+            box_selector = "#cf_turnstile div, #cf-turnstile div, .turnstile>div>div"
+            
+            if challenge_type != "embedded":
+                box_selector = ".main-content p+div>div>div"
+                while "Verifying you are human." in (await _get_page_content(page)):
+                    await page.wait_for_timeout(500)
+            
+            outer_box = {}
+            iframe = page.frame(url=__CF_PATTERN__)
+            print(f"[DEBUG] Found iframe: {iframe is not None}")
+            
+            if iframe is not None:
+                await _wait_for_page_stability(iframe, True, False)
+                
+                frame_el = await iframe.frame_element()
+                if challenge_type != "embedded":
+                    while not await frame_el.is_visible():
+                        await page.wait_for_timeout(500)
+                
+                outer_box = await frame_el.bounding_box()
+                print(f"[DEBUG] Got bounding box from iframe: {outer_box}")
+            
+            if not iframe or not outer_box:
+                if "<title>Just a moment...</title>" not in (await _get_page_content(page)):
+                    print(f"[DEBUG] Challenge disappeared before clicking")
+                    return None
+                
+                outer_box = await page.locator(box_selector).last.bounding_box()
+                print(f"[DEBUG] Got bounding box from locator: {outer_box}")
+            
+            # Calculate the Captcha coordinates
+            captcha_x = outer_box["x"] + randint(26, 28)
+            captcha_y = outer_box["y"] + randint(25, 27)
+            print(f"[DEBUG] Clicking at coordinates: ({captcha_x}, {captcha_y})")
+            
+            # Click the captcha
+            await page.mouse.click(captcha_x, captcha_y, delay=randint(100, 200), button="left")
+            await _wait_for_networkidle(page)
+            
+            if challenge_type != "embedded":
+                attempts = 0
+                while "<title>Just a moment...</title>" in (await _get_page_content(page)):
+                    if attempts >= 100:
+                        print(f"[DEBUG] Timeout waiting for challenge to disappear")
+                        break
+                    await page.wait_for_timeout(100)
+                    attempts += 1
+            
+            await _wait_for_page_stability(page, True, False)
+            
+            if "<title>Just a moment...</title>" not in (await _get_page_content(page)):
+                print(f"[DEBUG] Challenge solved successfully")
+                return None
+            else:
+                # Recursive call if still present
+                print(f"[DEBUG] Challenge still present, retrying...")
+                return await self.cloudflare_solver(page)
     
     async def close(self):
         """Close all pages and the session."""
@@ -189,11 +281,11 @@ class InteractionTools:
                 # Check if we're on a Cloudflare challenge page
                 title = await page.title()
                 if "just a moment" in title.lower() or "attention required" in title.lower():
-                    cloudflare_solved = await wrapper.solve_cloudflare_challenge(page)
+                    await wrapper.cloudflare_solver(page)
+                    cloudflare_solved = True
                     
                     # Wait for stability after solving
-                    if cloudflare_solved:
-                        await page.wait_for_load_state("networkidle", timeout=30000)
+                    await page.wait_for_load_state("networkidle", timeout=30000)
         
         return {
             "url": page.url,
