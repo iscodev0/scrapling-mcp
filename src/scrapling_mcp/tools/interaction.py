@@ -14,7 +14,6 @@ class InteractionTools:
     async def _get_page(self, session_id: str) -> Any:
         """Get or create a persistent page for a session."""
         if session_id not in self._pages:
-            # Get the session entry
             entry = self.server._sessions.get(session_id)
             if not entry:
                 raise ValueError(f"Session '{session_id}' not found")
@@ -23,21 +22,38 @@ class InteractionTools:
             if not session.context:
                 raise ValueError(f"Session '{session_id}' has no browser context")
             
-            # Create a new page from the context
             page = await session.context.new_page()
             self._pages[session_id] = page
         
         return self._pages[session_id]
 
-    async def browser_navigate(self, session_id: str, url: str) -> dict[str, Any]:
-        """Navigate to a URL in the browser session.
+    async def _wait_for_cloudflare(self, page: Any, timeout: int = 30000) -> bool:
+        """Wait for Cloudflare challenge to resolve if present."""
+        try:
+            title = await page.title()
+            if "just a moment" in title.lower() or "attention required" in title.lower():
+                await page.wait_for_function(
+                    "() => !document.title.toLowerCase().includes('just a moment') && !document.title.toLowerCase().includes('attention required')",
+                    timeout=timeout
+                )
+                return True
+        except:
+            pass
+        return False
+
+    async def browser_navigate(self, session_id: str, url: str, solve_cloudflare: bool = True) -> dict[str, Any]:
+        """Navigate to a URL in the browser session. Automatically handles Cloudflare challenges for stealthy sessions.
         
         :param session_id: ID of the session to use
         :param url: URL to navigate to
+        :param solve_cloudflare: Wait for Cloudflare challenge to resolve (default: True)
         :return: Dict with final URL and title
         """
         page = await self._get_page(session_id)
         await page.goto(url, wait_until="networkidle")
+        
+        if solve_cloudflare:
+            await self._wait_for_cloudflare(page)
         
         return {
             "url": page.url,
