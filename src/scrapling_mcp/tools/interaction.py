@@ -82,28 +82,22 @@ class CloudflareBypassSession:
         Solve the cloudflare challenge displayed on the playwright page.
         Replicates Scrapling's _cloudflare_solver for async use.
         """
-        print(f"[DEBUG] Starting Cloudflare solver")
         await _wait_for_networkidle(page, timeout=5000)
         page_content = await _get_page_content(page)
         challenge_type = _detect_cloudflare(page_content)
-        print(f"[DEBUG] Detected challenge type: {challenge_type}")
         
         if not challenge_type:
-            print(f"[DEBUG] No Cloudflare challenge detected")
             return None
         
         if challenge_type == "non-interactive":
             # Non-interactive challenge: just wait
-            print(f"[DEBUG] Non-interactive challenge, waiting...")
             while "<title>Just a moment...</title>" in (await _get_page_content(page)):
                 await page.wait_for_timeout(1000)
                 await page.wait_for_load_state()
-            print(f"[DEBUG] Non-interactive challenge solved")
             return None
         
         else:
             # Interactive challenge: need to click the checkbox
-            print(f"[DEBUG] Interactive challenge detected: {challenge_type}")
             box_selector = "#cf_turnstile div, #cf-turnstile div, .turnstile>div>div"
             
             if challenge_type != "embedded":
@@ -113,7 +107,6 @@ class CloudflareBypassSession:
             
             outer_box = {}
             iframe = page.frame(url=__CF_PATTERN__)
-            print(f"[DEBUG] Found iframe: {iframe is not None}")
             
             if iframe is not None:
                 await _wait_for_page_stability(iframe, True, False)
@@ -124,20 +117,16 @@ class CloudflareBypassSession:
                         await page.wait_for_timeout(500)
                 
                 outer_box = await frame_el.bounding_box()
-                print(f"[DEBUG] Got bounding box from iframe: {outer_box}")
             
             if not iframe or not outer_box:
                 if "<title>Just a moment...</title>" not in (await _get_page_content(page)):
-                    print(f"[DEBUG] Challenge disappeared before clicking")
                     return None
                 
                 outer_box = await page.locator(box_selector).last.bounding_box()
-                print(f"[DEBUG] Got bounding box from locator: {outer_box}")
             
             # Calculate the Captcha coordinates
             captcha_x = outer_box["x"] + randint(26, 28)
             captcha_y = outer_box["y"] + randint(25, 27)
-            print(f"[DEBUG] Clicking at coordinates: ({captcha_x}, {captcha_y})")
             
             # Click the captcha
             await page.mouse.click(captcha_x, captcha_y, delay=randint(100, 200), button="left")
@@ -147,7 +136,6 @@ class CloudflareBypassSession:
                 attempts = 0
                 while "<title>Just a moment...</title>" in (await _get_page_content(page)):
                     if attempts >= 100:
-                        print(f"[DEBUG] Timeout waiting for challenge to disappear")
                         break
                     await page.wait_for_timeout(100)
                     attempts += 1
@@ -155,11 +143,9 @@ class CloudflareBypassSession:
             await _wait_for_page_stability(page, True, False)
             
             if "<title>Just a moment...</title>" not in (await _get_page_content(page)):
-                print(f"[DEBUG] Challenge solved successfully")
                 return None
             else:
                 # Recursive call if still present
-                print(f"[DEBUG] Challenge still present, retrying...")
                 return await self.cloudflare_solver(page)
     
     async def close(self):
