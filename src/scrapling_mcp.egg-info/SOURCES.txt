@@ -3,7 +3,6 @@ README.md
 pyproject.toml
 src/scrapling_mcp/__init__.py
 src/scrapling_mcp/__main__.py
-src/scrapling_mcp/browser.py
 src/scrapling_mcp/cli.py
 src/scrapling_mcp/py.typed
 src/scrapling_mcp/server.py
@@ -14,7 +13,5 @@ src/scrapling_mcp.egg-info/entry_points.txt
 src/scrapling_mcp.egg-info/requires.txt
 src/scrapling_mcp.egg-info/top_level.txt
 src/scrapling_mcp/tools/__init__.py
-src/scrapling_mcp/tools/extraction.py
-src/scrapling_mcp/tools/fetching.py
 src/scrapling_mcp/tools/interaction.py
 src/scrapling_mcp/tools/parsing.py

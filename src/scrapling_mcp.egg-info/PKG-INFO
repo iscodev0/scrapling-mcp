@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: scrapling-mcp
-Version: 0.1.0
+Version: 0.2.0
 Summary: MCP server for web scraping and browser automation powered by Scrapling
 Author-email: iscodev <iscodev0@users.noreply.github.com>
 Maintainer-email: iscodev <iscodev0@users.noreply.github.com>
@@ -38,54 +38,63 @@ Requires-Dist: ruff>=0.1.0; extra == "dev"
 Requires-Dist: mypy>=1.0.0; extra == "dev"
 Dynamic: license-file
 
-# Scrapling MCP Server
+# Scrapling MCP Server (Extended)
 
 [![PyPI version](https://img.shields.io/pypi/v/scrapling-mcp.svg)](https://pypi.org/project/scrapling-mcp/)
 [![Python versions](https://img.shields.io/pypi/pyversions/scrapling-mcp.svg)](https://pypi.org/project/scrapling-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Model Context Protocol (MCP) server that provides browser automation and web scraping capabilities using [Scrapling](https://github.com/D4Vinci/Scrapling). This server enables LLMs to interact with web pages, bypass anti-bot systems, and extract data with precision.
+An **extended** Model Context Protocol (MCP) server that builds on top of the [official Scrapling MCP](https://github.com/D4Vinci/Scrapling) to add **interactive browser automation** capabilities. This server combines the best of both worlds: Scrapling's powerful web scraping engine with Playwright-style browser interaction tools.
+
+## Why Extended?
+
+The official Scrapling MCP provides excellent fetch-and-extract capabilities with anti-bot bypass, but lacks interactive browser automation. This extended version adds:
+
+- **Browser Interaction**: Click, type, hover, press keys, select options
+- **Navigation**: Navigate to URLs, go back in history
+- **JavaScript Execution**: Evaluate arbitrary JS expressions
+- **Page Snapshots**: Get structured page content for further parsing
+- **Advanced Parsing**: CSS selectors, XPath, find by text/regex, find similar elements
+
+All while preserving the official tools: `get`, `fetch`, `stealthy_fetch`, `bulk_get`, `bulk_fetch`, `bulk_stealthy_fetch`, `open_session`, `close_session`, `list_sessions`, and `screenshot`.
 
 ## Features
 
-### 🚀 Fetching Tools (4)
-- **`get`**: Fast HTTP requests with browser fingerprint impersonation, TLS fingerprinting, and HTTP/3 support
-- **`fetch`**: Dynamic content fetching with Chromium browser via Playwright
-- **`stealthy_fetch`**: Stealth browser that bypasses Cloudflare Turnstile/Interstitial and anti-bot systems
-- **`bulk_get`**: Concurrent multi-URL fetching with async HTTP requests
+### 🚀 Official Scrapling Tools (10)
+All tools from the official Scrapling MCP with full parameter support:
+- **`get`**: Fast HTTP requests with browser fingerprint impersonation, TLS fingerprinting, HTTP/3, SSRF protection, retries, cookies, auth
+- **`bulk_get`**: Concurrent multi-URL HTTP requests
+- **`fetch`**: Dynamic content fetching with Chromium browser (Playwright)
+- **`bulk_fetch`**: Concurrent multi-URL dynamic fetching
+- **`stealthy_fetch`**: Stealth browser with Cloudflare Turnstile/Interstitial bypass
+- **`bulk_stealthy_fetch`**: Concurrent multi-URL stealthy fetching
+- **`open_session`**: Create persistent browser session (dynamic or stealthy)
+- **`close_session`**: Close browser session and free resources
+- **`list_sessions`**: List all active browser sessions
+- **`screenshot`**: Capture PNG/JPEG screenshots (returns native ImageContent)
 
-### 🔍 Parsing Tools (7)
-- **`css`**: Find elements using CSS selectors
-- **`xpath`**: Find elements using XPath expressions
-- **`find`**: Find elements by tag name and/or text content regex
-- **`find_text`**: Find elements by exact text content match
-- **`find_regex`**: Find elements whose text content matches a regex pattern
-- **`similar`**: Find structurally similar elements using Scrapling's intelligent algorithms
-- **`parse_raw_html`**: Parse raw HTML content directly
-
-### 📤 Extraction Tools (6)
-- **`get_text`**: Extract clean text content (ignores script/style tags)
-- **`get_html`**: Extract raw HTML content
-- **`get_markdown`**: Extract content as Markdown (AI-friendly format)
-- **`get_links`**: Extract all links with href and text
-- **`get_tables`**: Extract HTML tables as structured data
-- **`get_attributes`**: Extract specific attributes from elements
-
-### 🎮 Browser Interaction Tools (14)
-- **`browser_open_session`**: Open persistent browser session (dynamic or stealthy)
-- **`browser_close_session`**: Close browser session and free resources
-- **`browser_list_sessions`**: List all active browser sessions
-- **`browser_navigate`**: Navigate to URL
+### 🎮 Interactive Browser Tools (10) - EXTENDED
+Tools not available in the official Scrapling MCP:
+- **`browser_navigate`**: Navigate to URL in existing session
 - **`browser_navigate_back`**: Go back in browser history
-- **`browser_click`**: Click elements
+- **`browser_click`**: Click elements by CSS selector
 - **`browser_type`**: Type text into input fields
-- **`browser_press_key`**: Press keyboard keys
+- **`browser_press_key`**: Press keyboard keys (Enter, Tab, Escape, etc.)
 - **`browser_hover`**: Hover over elements
 - **`browser_select_option`**: Select dropdown options
 - **`browser_evaluate`**: Execute JavaScript expressions
-- **`browser_screenshot`**: Take screenshots (PNG/JPEG)
 - **`browser_wait`**: Wait for elements or text to appear
 - **`browser_snapshot`**: Get structured page snapshot (URL, title, text content)
+
+### 🔍 Parsing Tools (7) - EXTENDED
+Advanced parsing capabilities using Scrapling's Selector API:
+- **`parse_raw_html`**: Parse raw HTML content directly
+- **`css`**: Find elements using CSS selectors
+- **`xpath`**: Find elements using XPath expressions
+- **`find`**: Find elements by tag name and/or text regex
+- **`find_text`**: Find elements by exact text match
+- **`find_regex`**: Find elements by regex pattern
+- **`similar`**: Find structurally similar elements using Scrapling's intelligent algorithms
 
 ## Installation
 
