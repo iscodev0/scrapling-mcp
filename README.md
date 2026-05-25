@@ -240,6 +240,41 @@ All tools have been tested and verified to work correctly:
 
 **Overall: 26/27 tools working correctly (96%)**
 
+## Known Limitations
+
+### Cloudflare Bypass with Interactive Sessions
+
+The official Scrapling MCP's `open_session` does **not** support `solve_cloudflare`. This means:
+
+- ✅ `stealthy_fetch(solve_cloudflare=True)` - Bypasses Cloudflare successfully
+- ❌ `open_session` + `browser_navigate` - Gets stuck on Cloudflare challenge pages
+
+**Workaround for Cloudflare-protected sites:**
+
+1. **For scraping**: Use `stealthy_fetch` with `solve_cloudflare=True`, then use parsing tools (`css`, `xpath`, etc.) on the extracted content
+2. **For complex interactions**: Use multiple `stealthy_fetch` calls with different URLs as needed
+3. **For non-protected sites**: Use `open_session` + interactive tools (`browser_navigate`, `browser_click`, etc.) normally
+
+**Example workflow for Cloudflare-protected sites:**
+
+```python
+# Step 1: Fetch with Cloudflare bypass
+result = stealthy_fetch(
+    url="https://protected-site.com/page",
+    solve_cloudflare=True,
+    extraction_type="html"
+)
+
+# Step 2: Parse the HTML content
+parse_raw_html(html=result.content[0])
+
+# Step 3: Extract data using CSS/XPath
+elements = css(selector=".product-card")
+titles = css(selector=".product-title")
+```
+
+This limitation exists because the official Scrapling MCP's session management doesn't expose the `solve_cloudflare` parameter. Future versions may address this by implementing custom session handling.
+
 ## Architecture
 
 The server combines two powerful approaches:
