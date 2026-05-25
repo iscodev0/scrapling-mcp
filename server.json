@@ -1,0 +1,23 @@
+{
+  "name": "scrapling-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for web scraping and browser automation powered by Scrapling",
+  "transport": {
+    "stdio": {
+      "command": "scrapling-mcp"
+    },
+    "http": {
+      "command": "scrapling-mcp",
+      "args": ["--http", "--port", "4891"]
+    }
+  },
+  "tools": [
+    "get", "fetch", "stealthy_fetch", "bulk_get",
+    "parse_raw_html", "css", "xpath", "find", "find_text", "find_regex", "similar",
+    "get_text", "get_html", "get_markdown", "get_links", "get_tables", "get_attributes",
+    "browser_open_session", "browser_close_session", "browser_list_sessions",
+    "browser_navigate", "browser_navigate_back", "browser_click", "browser_type",
+    "browser_press_key", "browser_hover", "browser_select_option",
+    "browser_evaluate", "browser_screenshot", "browser_wait", "browser_snapshot"
+  ]
+}

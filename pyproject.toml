@@ -1,0 +1,97 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrapling-mcp"
+version = "0.1.0"
+description = "MCP server for web scraping and browser automation powered by Scrapling"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "iscodev", email = "iscodev0@users.noreply.github.com"}
+]
+maintainers = [
+    {name = "iscodev", email = "iscodev0@users.noreply.github.com"}
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "scrapling",
+    "web-scraping",
+    "browser-automation",
+    "playwright",
+    "anti-bot",
+    "cloudflare-bypass",
+    "llm",
+    "ai",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Markup :: HTML",
+]
+dependencies = [
+    "mcp>=1.0.0",
+    "scrapling[all]>=0.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/iscodev0/scrapling-mcp"
+Documentation = "https://github.com/iscodev0/scrapling-mcp#readme"
+Repository = "https://github.com/iscodev0/scrapling-mcp"
+Issues = "https://github.com/iscodev0/scrapling-mcp/issues"
+Changelog = "https://github.com/iscodev0/scrapling-mcp/blob/main/CHANGELOG.md"
+
+[project.scripts]
+scrapling-mcp = "scrapling_mcp.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+scrapling_mcp = ["py.typed"]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
